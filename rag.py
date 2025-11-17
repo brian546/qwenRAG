@@ -1,113 +1,203 @@
-from typing import List
-from document import Document
-from recorder import Recorder
+# File: rag.py
+# Description: This script provides modules to load LangGraph RAG Workflow with ChromaDB vector store and Ollama Qwen2.5 model
 
-class BasicRAG:
-    """Basic RAG system based on context retrived with functions that build prompt and generate response"""
-    def __init__(self, model, tokenizer, vector_store, device='cuda'):
-        self.device = device
-        self.model = model
-        self.model.to(device)
-        self.tokenizer = tokenizer
-        self.vector_store = vector_store
-        self.assistant_instruction = """You are a helpful assistant. Reply briefly and only with information explicitly stated in the context that directly answers the question. If you cannot find an answer based on the provided information, say "I don't have enough information to answer that.". Use the following examples as a guide for your response style:
+from langchain_chroma import Chroma
+from langchain_community.embeddings import Model2vecEmbeddings
 
-        Example 1:
-        Context: The capital of Germany is the city of Berlin. The capital of France is Paris.
-        Query: What is the capital of Germany?
-        Answer: The capital of Germany is Berlin.
 
-        Example 2:
-        Context: William Shakespeare was an English playwright. He wrote Romeo and Juliet in the 1590s.
-        Query: Who wrote Romeo and Juliet?
-        Answer: Romeo and Juliet was written by William Shakespeare.
+from ragtype import Message, RAGState
 
-        Example 3:
-        Context: BeiJing is in China.
-        Query: Where is New York?
-        Answer: I don't have enough information to answer that.
+# chat model
+from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, END
 
+from langgraph.checkpoint.memory import MemorySaver
+
+from retriever import load_vector_store, hybrid_retrieval
+
+# %%
+#===============================
+#           Config
+#===============================
+
+MODEL_NAME = "qwen2.5:7b-instruct"
+VEC_EMBED_NAME = "minishlab/potion-base-8M"
+PERSIST_DIR=  "./data/chromadb"
+DOC_NUM = 10 # number of documents retrieved rom vector store
+MAX_MEMORY_SIZE = 8 # max number of messages to keep in history
+
+# %%
+#===============================
+#       Load Vector Store
+#===============================
+# def load_vector_store():
+#     """Load the vector store from ChromaDB."""
+#     embeddings = Model2vecEmbeddings(VEC_EMBED_NAME)
+
+
+#     vector_store = Chroma(
+#         persist_directory=PERSIST_DIR,
+#         embedding_function=embeddings,
+#         collection_name="model2vec_embeddings_3"
+#     )
+
+#     print(f"Loaded {vector_store._collection.count()} vectors.")
+
+#     return vector_store
+
+# %%
+
+    # count_regenerate: int = 0
+    # should_do_search: bool = True
+
+# %%
+def load_graph():
+    """Load the RAG agent."""
+    vector_store = load_vector_store("minilm")
+
+    response_model = init_chat_model(
+        model=MODEL_NAME,
+        model_provider="ollama",
+        temperature=0,
+    )
+
+    def rewrite_query(state: RAGState) -> str:
         """
-        
-    def _build_prompt(self, query: str, contexts: List[Document]) -> str:
-        """Build a prompt combining the query and retrieved contexts."""
-        context_str = "\n\n".join([doc.text for doc in contexts])
-        
-        prompt = f"""{self.assistant_instruction}
-        
-        Now, use this context to answer the query:
-        Context:
-        {context_str}
+            Rewrite a user query to improve retrieval quality.
 
-        Query: {query}
+            Returns:
+            rewritten_query: The rewritten query optimized for retrieval
+        """
+        question = state["question"]
+        history = state.get("history", [])
+        history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history]) if history else "None"
 
-        Answer:"""
-        
-        return prompt
-    
-    def generate_response(self, query: str, max_new_tokens: int = 200) -> str:
-        """Generate a response using RAG."""
-        # Retrieve relevant documents
-        relevant_docs = self.vector_store.search(query)
-        
-        # Build prompt
-        prompt = self._build_prompt(query, relevant_docs)
-        
-        # Generate response
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            num_return_sequences=1,
-            temperature=0.3, # less creative answer
-            do_sample=True,            # optional: makes it less repetitive
-            pad_token_id=self.tokenizer.eos_token_id 
+        rewrite_prompt = f"""Rewrite the following query to improve retrieval. If there are previsou conversations, please reference them.
+        Original query: {question}
+        Previous conversations: {history}
+        Directly return the rewritten query, no other text."""
+
+        response = response_model.invoke(
+            [{"role": "user", "content": rewrite_prompt}])
+
+        return {"rewritten_query": response.content}
+
+    def search_documents(state: RAGState):
+        """Search documents."""
+        query = state["rewritten_query"]
+        retrieved_docs = vector_store.similarity_search(query, k=DOC_NUM)
+        context = [doc.page_content for doc in retrieved_docs]
+        all_retrieved_docs = state.get("retrieved_docs", []) + context
+        all_retrieved_docs = list(set(all_retrieved_docs))
+        return {"retrieved_docs": all_retrieved_docs}
+
+
+    def chain_of_thought(state: RAGState):
+        """Think step by step"""
+
+
+        GENERATE_PROMPT = (
+            "You are an assistant for question-answering tasks. "
+            "Not all context and previsou concversation are related to the question. You need to only use the relevant parts to think step by step to answer the question. "
+            "If you don't know the answer, just say that you don't know. "
+            """ Think step by step using the following structure:
+            1. **Understand**: Restate the question in your own words and identify key elements.
+            2. **Gather**: List all relevant facts, assumptions, or data from the context.
+            3. **Break Down**: Divide the problem into smaller, manageable sub-problems or steps.
+            4. **Solve/Analyze**: Address each sub-step logically. Show calculations, reasoning justifications, or trade-offs.
+            5. **Verify**: Check for errors, inconsistencies, or alternative perspectives.
+            6. **Conclude**: Summarize the final answer or recommendation clearly.\n\n"""
+            "Question: {question} \n"
+            "Previous Conversations: {history}\n"
+            "Context: {context}"
         )
-        
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        return response.split("Answer:")[-1].strip()
-    
-class MultiTurnRAG(BasicRAG):
-    def __init__(self, model, tokenizer, vector_store, memory_size = 5):
-        super().__init__(model, tokenizer, vector_store)
-        self.recorder = Recorder(memory_size=memory_size)
-        
-    def _build_prompt(self, query: str, contexts: List[Document], include_history: bool = True) -> str:
-        """Build a prompt with conversation history."""
-        context_str = "\n\n".join([doc.text for doc in contexts])
-        
-        history_str = ""
-        if include_history and self.recorder.history:
-            # print(history)
-            history = self.recorder.history
-            history_str = "\n".join([
-                f"Query: {h['query']}\nAnswer: {h['response']}"
-                for h in history 
-            ])
-            history_str = f"\nPrevious conversation:\n{history_str}\n"
+        question = state["question"]
+        context = "\n\n".join(state["retrieved_docs"])
+        history = state.get("history",[])
+        history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history]) if history else "None"
+        prompt = GENERATE_PROMPT.format(question=question, context=context, history=history)
+        response = response_model.invoke([{"role": "user", "content": prompt}])
+        return {"thought": response.content}
 
-        # integrate conversation history and context into prompt
-        prompt = f"""{self.assistant_instruction}
 
-        {history_str}
+    def generate_answer(state: RAGState):
+        """Generate an answer."""
 
-        Now, use this context to answer the query:
-        Context:
-        {context_str}
+        GENERATE_PROMPT = (
+            "You are an assistant for question-answering tasks. "
+            "Based on the conclusion of chain of thoughts to answer the question. "
+            "Beginning with 'Answer:' to answer the question"
+            "Keep the answer concise and simple.\n"
 
-        Query: {query}
+            "Question: {question} \n"
+            "Chain of Thought: {thought}\n"
+        )
 
-        Answer:"""
-        
-        return prompt
-    
-    def generate_response(self, query: str, max_new_tokens: int = 200) -> str:
-        """Generate a response with conversation context. And update history"""
 
-        response = super().generate_response(query, max_new_tokens)
-        
-        # Update conversation history
-        self.recorder.append_history(query, response)
-        
-        return response
+        question = state["question"]
+        thought = state["thought"]
+
+        prompt = GENERATE_PROMPT.format(question=question,thought=thought)
+        response = response_model.invoke([{"role": "user", "content": prompt}])
+        response = response.content.split("Answer:")[-1].strip()
+
+
+        # update history
+        history = state.get("history", [])
+        history.append(Message(role="user", content=question))
+        history.append(Message(role="assistant", content=response))
+
+        # remove old history
+        if len(history) > MAX_MEMORY_SIZE:
+            history = history[MAX_MEMORY_SIZE:]
+
+        # reply the question, 
+        # save the conversation history 
+        # and clean the retrived docs for question in next round
+        return {"answer": response, "history": history, "retrieved_docs": []}
+
+
+    workflow = StateGraph(RAGState)
+    workflow.add_node(rewrite_query)
+    workflow.add_node(search_documents)
+    workflow.add_node(generate_answer)
+    workflow.add_node(chain_of_thought)
+    workflow.add_edge(START, "rewrite_query")
+    workflow.add_edge("rewrite_query", "search_documents")
+    workflow.add_edge("search_documents", "chain_of_thought")
+    workflow.add_edge("chain_of_thought", "generate_answer")
+    workflow.add_edge("generate_answer", END)
+
+    # memory checkpointer for mult-turn conversation
+    memory = MemorySaver()
+    graph = workflow.compile(checkpointer=memory)
+    return graph
+    # import IPython
+    # IPython.display.Image(graph.get_graph().draw_mermaid_png())
+
+# %%
+
+# # fix thread id for mult-turn conversation
+# config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+# questions = [
+#     "What island is included in the geographic area home to a variety of publications describing Hong Kong Cantonese as \"Hong Kong speech\"?",
+#     "where is the island",
+#     "what country does it belong to?",
+# ]
+# for q in questions:
+#     for chunk in graph.stream({"question": q}, config):
+#         for node, update in chunk.items():
+#             print(node)
+#             print(update)
+#             print("-" * 10 + f" {node} " + "-" * 10)
+#             if node == "search_documents":
+#                 print(f"Retrieved {len(update['retrieved_docs'])} docs")
+#             else:
+#                 print(update)
+#             print("\n")
+
+# %%
+
+
+

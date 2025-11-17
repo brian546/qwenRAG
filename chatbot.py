@@ -1,0 +1,70 @@
+import streamlit as st
+from ragtype import Message
+from rag import load_graph
+
+
+# only load the graph once
+if "langgraph_app" not in st.session_state:
+    st.session_state.langgraph_app = load_graph()
+
+
+app = st.session_state.langgraph_app
+
+# --- 2. Streamlit Chat UI ---
+st.title("LangGraph Chat")
+
+# Initialize chat history and config
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "config" not in st.session_state:
+    st.session_state.config = {"configurable": {"thread_id": "myrag"}}
+
+
+# record message in frontend side
+for message in st.session_state.messages:
+    if message["role"] == "user":
+        with st.chat_message("user"):
+            st.write(message["content"])
+    elif message["role"] == "assistant":
+        with st.chat_message("assistant"):
+            st.write(message["content"])
+
+# Chat input
+if prompt := st.chat_input("Ask the LangGraph agent..."):
+    # Add user message
+    st.session_state.messages.append(Message(role="user", content=prompt))
+    with st.chat_message("user"):
+        st.write(prompt)
+
+    # Run LangGraph with streaming
+    assistant_container = st.chat_message("assistant")
+    with assistant_container:
+        with st.spinner("Thinking..."):
+
+            # Stream the graph
+            intermediate_outputs = []  # Collect intermediate steps
+            answer = None
+            for chunk in app.stream({"question": prompt}, st.session_state.config):
+                for node, update in chunk.items():
+                    if node == "search_documents":
+                        docs = update["retrieved_docs"]
+                    
+                    elif node == "chain_of_thought":
+                        cot = update["thought"]
+                    
+                    elif node == "generate_answer":
+                        answer = update["answer"]
+
+            with st.expander("Documents Retrieved"):
+                st.text('\n\n'.join([doc for doc in docs]))
+
+            # Display intermediate steps in an expander for cleanliness
+            with st.expander("Chain of Thought"):
+                st.text(cot)
+
+        # Display final response
+        if answer:
+            st.write(answer)
+            st.session_state.messages.append(Message(role="assistant", content=answer))
+        else:
+            st.write("No final response generated.")
