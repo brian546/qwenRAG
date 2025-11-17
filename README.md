@@ -1,9 +1,16 @@
 # QwenRAG
 
-This repository trains and runs inference for binary sentiment classification on movie reviews using
-BERT-type models (BERT and RoBERTa) in Linux Ubuntu 24.04. It includes tokenization, model building, training, validation,
-and inference scripts that produce CSV submission files.
+This repository implements a Retrieval-Augmented Generation (RAG) system using the Qwen-2.5-instruct model. The system integrates various vector store for retrieval and provides a StreamLit-based chatbot interface for interactive question answering based on 
 
 ## Set up environment
-conda create -n rag python=3.12
+```bash
+conda env create -n rag -f environment.yml
 conda activate rag
+```
+
+## Run Chatbot
+Execute the following command to start a Streamlit-based chatbot application. After running it, Streamlit will display a local URL (usually http://localhost:8501). Open that URL in your web browser to access and interact with the chatbot app.
+
+```bash
+streamlit run chatbot.py
+```

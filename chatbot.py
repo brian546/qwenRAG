@@ -1,17 +1,28 @@
+# File: chatbot.py
+# Description: StreamLit-based chatbot interface for LangGraph RAG system using ChromaDB and Qwen2.5 model
+
 import streamlit as st
 from ragtype import Message
 from rag import load_graph
 
 
-# only load the graph once
-if "langgraph_app" not in st.session_state:
-    st.session_state.langgraph_app = load_graph()
+st.title("LangGraph Chat")
 
+# select retrieval strategy
+# Default: static embeddings
+retrieval_strategy = st.selectbox(
+    "Retrieval strategy",
+    options=["static", "dense", "minilm"],
+    index=0,
+    help="Select the embedding model for vector store retrieval. The chatbot will be reloaded when the model is changed.")
+
+# only load the graph once
+if "langgraph_app" not in st.session_state or st.session_state.retrieval_strategy != retrieval_strategy:
+    st.session_state.retrieval_strategy = retrieval_strategy
+    st.session_state.messages = [] # clear the chat history
+    st.session_state.langgraph_app = load_graph(st.session_state.retrieval_strategy) # reload the graph with defined retrieval strategy
 
 app = st.session_state.langgraph_app
-
-# --- 2. Streamlit Chat UI ---
-st.title("LangGraph Chat")
 
 # Initialize chat history and config
 if "messages" not in st.session_state:

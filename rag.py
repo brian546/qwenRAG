@@ -21,39 +21,15 @@ from retriever import load_vector_store, hybrid_retrieval
 #===============================
 
 MODEL_NAME = "qwen2.5:7b-instruct"
-VEC_EMBED_NAME = "minishlab/potion-base-8M"
 PERSIST_DIR=  "./data/chromadb"
 DOC_NUM = 10 # number of documents retrieved rom vector store
 MAX_MEMORY_SIZE = 8 # max number of messages to keep in history
 
-# %%
-#===============================
-#       Load Vector Store
-#===============================
-# def load_vector_store():
-#     """Load the vector store from ChromaDB."""
-#     embeddings = Model2vecEmbeddings(VEC_EMBED_NAME)
-
-
-#     vector_store = Chroma(
-#         persist_directory=PERSIST_DIR,
-#         embedding_function=embeddings,
-#         collection_name="model2vec_embeddings_3"
-#     )
-
-#     print(f"Loaded {vector_store._collection.count()} vectors.")
-
-#     return vector_store
 
 # %%
-
-    # count_regenerate: int = 0
-    # should_do_search: bool = True
-
-# %%
-def load_graph():
+def load_graph(embed: str = "static") -> StateGraph:
     """Load the RAG agent."""
-    vector_store = load_vector_store("minilm")
+    vector_store = load_vector_store(embed)
 
     response_model = init_chat_model(
         model=MODEL_NAME,
@@ -93,7 +69,7 @@ def load_graph():
 
 
     def chain_of_thought(state: RAGState):
-        """Think step by step"""
+        """Think step by step using chain of thought prompting to derive the answer."""
 
 
         GENERATE_PROMPT = (
@@ -122,7 +98,7 @@ def load_graph():
 
 
     def generate_answer(state: RAGState):
-        """Generate an answer."""
+        """Generate the final answer after chain of thought reasoning."""
 
         GENERATE_PROMPT = (
             "You are an assistant for question-answering tasks. "

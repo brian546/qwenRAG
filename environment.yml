@@ -1,4 +1,4 @@
-name: test
+name: rag
 channels:
   - conda-forge
 dependencies:
