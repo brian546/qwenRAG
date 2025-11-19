@@ -61,15 +61,16 @@ def load_graph(embed: str = "static") -> StateGraph:
     def search_documents(state: RAGState):
         """Search documents."""
         query = state["rewritten_query"]
-        retrieved_docs = vector_store.similarity_search(query, k=DOC_NUM)
-        context = [doc.page_content for doc in retrieved_docs]
+        retrieved_docs = vector_store.similarity_search_with_relevance_scores(query, k=DOC_NUM)
+        context = [doc.page_content for doc, _ in retrieved_docs]
+        doc_id_scores = [[doc.metadata['id'],score] for doc, score in retrieved_docs]
         all_retrieved_docs = state.get("retrieved_docs", []) + context
         all_retrieved_docs = list(set(all_retrieved_docs))
-        return {"retrieved_docs": all_retrieved_docs}
+        return {"retrieved_docs": all_retrieved_docs, "retrieved_id_scores": doc_id_scores}
 
 
     def chain_of_thought(state: RAGState):
-        """Think step by step using chain of thought prompting to derive the answer."""
+        """Think step by step using chain of thought prompting."""
 
 
         GENERATE_PROMPT = (
@@ -98,7 +99,7 @@ def load_graph(embed: str = "static") -> StateGraph:
 
 
     def generate_answer(state: RAGState):
-        """Generate the final answer after chain of thought reasoning."""
+        """Generate the final answer"""
 
         GENERATE_PROMPT = (
             "You are an assistant for question-answering tasks. "
@@ -131,7 +132,7 @@ def load_graph(embed: str = "static") -> StateGraph:
         # reply the question, 
         # save the conversation history 
         # and clean the retrived docs for question in next round
-        return {"answer": response, "history": history, "retrieved_docs": []}
+        return {"answer": response, "history": history, "retrieved_docs": [], "retrieved_id_scores": [] }
 
 
     workflow = StateGraph(RAGState)

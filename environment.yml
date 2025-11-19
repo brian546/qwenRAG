@@ -16,4 +16,4 @@ dependencies:
     - sentence-transformers==5.1.2
     - streamlit==1.51.0
     - ipykernel==7.1.0
-
+    - pytrec-eval==0.5

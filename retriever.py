@@ -27,6 +27,9 @@ def load_vector_store(
             )
         else:
             raise FileNotFoundError("Directory does not exist. Run dataloader.py to generate chromadb embeddings with persistence.")
+        
+    else:
+        raise ValueError(f"Unsupported embeddings type: {embeddings}. Supported types are: {list(embedding_options.keys())}.")
 
 
 def hybrid_retrieval(
