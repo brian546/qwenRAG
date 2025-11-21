@@ -22,7 +22,7 @@ This repository implements a Retrieval-Augmented Generation (RAG) system using t
     - `chroma.sqlite3`: Chroma DB SQLite file (storage).
     - `<uuid>/` directories: internal Chroma data shards.
 
-## Set up environment
+## Set up Environment
 To set up the required environment, first intall ollama from [ollama.com](https://ollama.com/). After that, install qwen2.5-instruct model by running:
 ```bash
 ollama pull qwen2.5:7b-instruct
@@ -46,6 +46,12 @@ Execute the following command to start a Streamlit-based chatbot application. Af
 streamlit run chatbot.py
 ```
 
+## Generate Answers in test dataset
+To generate answers for  test dataset using the RAG system, run the following command:
+```bash
+python batch_generate.py -f data/test.jsonl
+```
+
 ## Run retrieval and generation evaluation
 To evaluate the retrieval and generation performance of the RAG system, you can use the provided evaluation scripts. For retrieval evaluation, run:
 ```bash
@@ -53,6 +59,6 @@ python eval/eval_retrieval.py --gold data/validation.jsonl --pred PREDICTED_FILE
 ``` 
 For generation evaluation, run:
 ```bash
-python eval/eval_hotpotqa.py --gold data/validation.jsonl --pred PREDICTED_FILE
+python eval/eval_hotpotqa.py --gold data/validation.jsonl -k 10 --pred PREDICTED_FILE 
 ``` 
 
