@@ -13,7 +13,7 @@ from langgraph.graph import StateGraph, START, END
 
 from langgraph.checkpoint.memory import MemorySaver
 
-from retriever import load_vector_store, hybrid_retrieval
+from retriever import load_vector_store
 
 # %%
 #===============================
@@ -61,9 +61,15 @@ def load_graph(embed: str = "static") -> StateGraph:
     def search_documents(state: RAGState):
         """Search documents."""
         query = state["rewritten_query"]
-        retrieved_docs = vector_store.similarity_search_with_relevance_scores(query, k=DOC_NUM)
-        context = [doc.page_content for doc, _ in retrieved_docs]
-        doc_id_scores = [[doc.metadata['id'],score] for doc, score in retrieved_docs]
+        if embed == "sparse":
+            retrieved_docs = vector_store.invoke(query) 
+            context = [doc.page_content for doc in retrieved_docs]
+            doc_id_scores = [[doc.metadata['id'],doc.metadata['score']] for doc in retrieved_docs]
+        else:
+            retrieved_docs = vector_store.similarity_search_with_relevance_scores(query, k=DOC_NUM)
+            context = [doc.page_content for doc, _ in retrieved_docs]
+            doc_id_scores = [[doc.metadata['id'],score] for doc, score in retrieved_docs]
+
         all_retrieved_docs = state.get("retrieved_docs", []) + context
         all_retrieved_docs = list(set(all_retrieved_docs))
         return {"retrieved_docs": all_retrieved_docs, "retrieved_id_scores": doc_id_scores}

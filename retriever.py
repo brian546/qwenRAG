@@ -1,46 +1,60 @@
 import os
+import pandas as pd
 from langchain_chroma import Chroma
 from langchain_community.embeddings import Model2vecEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers import EnsembleRetriever
-from langchain_core.documents import Document
+from custom_bm25 import CustomBM25Retriever as BM25Retriever
+from langchain_community.document_loaders import DataFrameLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+def load_sparse():
+    collection_split = pd.read_json(
+        "./data/collection.jsonl", lines=True
+    ).drop_duplicates(subset=["text"], keep="first")
+    collection_loader = DataFrameLoader(collection_split, page_content_column="text")
+    collection_docs = collection_loader.load()
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100,
+        length_function=len,
+        is_separator_regex=False,
+    )
+    documents = text_splitter.split_documents(collection_docs)
+
+    bm25_retriever = BM25Retriever.from_documents(documents, k=5)
+    return bm25_retriever
+
 
 def load_vector_store(
     embeddings: str,
-) -> Chroma:
+) -> Chroma | BM25Retriever:
     """
     embeddings: supports following embeddings to query from: static, dense, minilm
     """
     embedding_options = {
-        "static": Model2vecEmbeddings("minishlab/potion-base-8M"),
-        "dense": HuggingFaceEmbeddings(model="BAAI/bge-small-en-v1.5"),
-        "minilm": HuggingFaceEmbeddings(model="sentence-transformers/all-MiniLM-L6-v2")
+        "static": lambda: Model2vecEmbeddings(model="minishlab/potion-base-8M"),
+        "dense": lambda: HuggingFaceEmbeddings(model="BAAI/bge-small-en-v1.5"),
+        "sparse": lambda: load_sparse(),
+        "qwen": lambda: HuggingFaceEmbeddings(model="Qwen/Qwen3-Embedding-0.6B"),
+        "colbert": lambda: HuggingFaceEmbeddings(model="colbert-ir/colbertv2.0"),
     }
 
     if embeddings in embedding_options:
+        embedding_function = embedding_options[embeddings]()
+        if embeddings == "sparse":
+            return embedding_function
+        # Load and chunk documents for BM25
         if os.path.exists("./data/chromadb"):
             return Chroma(
                 persist_directory="./data/chromadb",
-                embedding_function=embedding_options[embeddings],
-                collection_name=f"{embeddings}_collection"
+                embedding_function=embedding_function,
+                collection_name=f"{embeddings}_collection",
             )
         else:
-            raise FileNotFoundError("Directory does not exist. Run dataloader.py to generate chromadb embeddings with persistence.")
-        
+            raise FileNotFoundError(
+                "Directory does not exist. Run dataloader.py to generate chromadb embeddings with persistence."
+            )
     else:
-        raise ValueError(f"Unsupported embeddings type: {embeddings}. Supported types are: {list(embedding_options.keys())}.")
-
-
-def hybrid_retrieval(
-    documents: list[Document],
-    embeddings: Model2vecEmbeddings | HuggingFaceEmbeddings,
-    collection_name: str
-) -> EnsembleRetriever:
-    # TODO: implement retriever from persistence db rather than documents
-    bm25_retriever = BM25Retriever.from_documents(documents)
-    vector_store_retriever = load_vector_store(embeddings, collection_name).as_retriever()
-    return EnsembleRetriever(
-        retrievers=[bm25_retriever, vector_store_retriever],
-        weights=[0.5, 0.5]
-    )
+        raise Exception("Provide embedding options that are acceptable")

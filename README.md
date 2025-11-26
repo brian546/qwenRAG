@@ -8,7 +8,7 @@ This repository implements a Retrieval-Augmented Generation (RAG) system using t
 - `chatbot.py`: Chat interface / CLI or Streamlit entrypoint that interacts with the RAG pipeline.
 - `dataloader.py`: Loads `.jsonl` datasets into memory and preprocesses text for indexing.
 - `environment.yml`: Conda environment specification with required packages.
-
+- `custom_bm25.py`: Custom BM25 retriever implementation.
 - `rag.py`: Core RAG orchestration — ties retriever, generator, and prompt handling together.
 - `ragtype.py`: Type definitions for messages and RAG state (see details below).
 - `retriever.py`: Retriever implementation — builds/queries the vector DB (Chroma/SQLite) and returns docs.

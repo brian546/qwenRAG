@@ -12,7 +12,7 @@ st.title("LangGraph Chat")
 # Default: static embeddings
 retrieval_strategy = st.selectbox(
     "Retrieval strategy",
-    options=["static", "dense", "minilm"],
+    options=["static", "sparse", "dense","qwen","colbert"],
     index=0,
     help="Select the embedding model for vector store retrieval. The chatbot will be reloaded when the model is changed.")
 
