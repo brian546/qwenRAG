@@ -5,7 +5,7 @@ This repository implements a Retrieval-Augmented Generation (RAG) system using t
 ## Project Structure
 
 - `batch_generate.py`: Batch-generation utilities and scripts for producing multiple queries or answers.
-- `chatbot.py`: Chat interface / CLI or Streamlit entrypoint that interacts with the RAG pipeline.
+- `chatbot.py`: Chat interface that interacts with the RAG pipeline.
 - `dataloader.py`: Loads `.jsonl` datasets into memory and preprocesses text for indexing.
 - `environment.yml`: Conda environment specification with required packages.
 - `custom_bm25.py`: Custom BM25 retriever implementation.
