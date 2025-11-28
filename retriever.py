@@ -38,7 +38,7 @@ def load_vector_store(
         "dense": lambda: HuggingFaceEmbeddings(model="BAAI/bge-small-en-v1.5"),
         "sparse": lambda: load_sparse(),
         "qwen": lambda: HuggingFaceEmbeddings(model="Qwen/Qwen3-Embedding-0.6B"),
-        "colbert": lambda: HuggingFaceEmbeddings(model="colbert-ir/colbertv2.0"),
+        # "colbert": lambda: HuggingFaceEmbeddings(model="colbert-ir/colbertv2.0"),
     }
 
     if embeddings in embedding_options:

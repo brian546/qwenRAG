@@ -10,7 +10,7 @@ embedding_options = {
     "static": lambda: Model2vecEmbeddings(model="minishlab/potion-base-8M"),
     "dense": lambda: HuggingFaceEmbeddings(model="BAAI/bge-small-en-v1.5"),
     "qwen": lambda: HuggingFaceEmbeddings(model="Qwen/Qwen3-Embedding-0.6B"),
-    "colbert": lambda: HuggingFaceEmbeddings(model="colbert-ir/colbertv2.0"),
+    # "colbert": lambda: HuggingFaceEmbeddings(model="colbert-ir/colbertv2.0"),
 }
 
 print("Loading dataset")

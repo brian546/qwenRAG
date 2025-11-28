@@ -10,7 +10,7 @@ import argparse
 # ===================
 DATA_FILE = "data/validation.jsonl"
 RESULT_DIR = 'results'
-EMBEDDING_TYPE = "dense"  # static, dense, minilm
+EMBEDDING_TYPE = "dense" 
 
 def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE):
     """
@@ -65,7 +65,7 @@ def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Batch generate answers for questions.')
     parser.add_argument('-f','--file', type=str, default=DATA_FILE, help='Path to the input data file.')
-    parser.add_argument('-e','--embed', type=str, default=EMBEDDING_TYPE, help='Embedding type: static, dense, minilm.')
+    parser.add_argument('-e','--embed', type=str, default=EMBEDDING_TYPE, help='Embedding type: static, dense, sparse, qwen, colbert.')
 
     args = parser.parse_args()
     data_file = args.file
