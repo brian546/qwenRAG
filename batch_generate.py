@@ -1,3 +1,6 @@
+# file: batch_generate.py
+# Description: This script runs batch generation of answers for questions in a data file using a RAG workflow.
+
 from rag import load_graph
 import uuid
 import json
@@ -12,9 +15,18 @@ DATA_FILE = "data/validation.jsonl"
 RESULT_DIR = 'results'
 EMBEDDING_TYPE = "dense" 
 
-def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE):
+def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE, chain_of_thought: bool = True):
     """
     Run batch generation for questions in DATA_FILE and save results to OUTPUT_FILE.
+
+    Parameters
+    ==========
+    data_file: str
+        Path to the input data file containing questions in JSONL format.
+    embed_type: str
+        Embedding type to use: static, dense, sparse, qwen
+    chain_of_thought: bool
+        Whether to use chain of thought reasoning.
     """
 
     data_file = Path(data_file)
@@ -28,7 +40,7 @@ def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE):
         data = [json.loads(line) for line in f if line.strip()]
 
 
-    graph = load_graph(embed=embed_type)
+    graph = load_graph(embed=embed_type, chain_of_thought=chain_of_thought)
 
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
@@ -44,7 +56,7 @@ def run_in_batch(data_file: str = DATA_FILE ,embed_type: str = EMBEDDING_TYPE):
             for node, update in chunk.items():
                 if node == "search_documents":
                     id_scrores = update["retrieved_id_scores"]
-                if node == "generate_answer":
+                if node == "generate_answer_from_context" or node == "generate_answer":
                     answer = update["answer"]
         
         mode = "a" if os.path.exists(output_file) else "w"
@@ -66,10 +78,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Batch generate answers for questions.')
     parser.add_argument('-f','--file', type=str, default=DATA_FILE, help='Path to the input data file.')
     parser.add_argument('-e','--embed', type=str, default=EMBEDDING_TYPE, help='Embedding type: static, dense, sparse, qwen, colbert.')
+    parser.add_argument('-s','--skip_chain', action='store_true', help='Skip Chain of thought')
 
     args = parser.parse_args()
     data_file = args.file
     embed = args.embed
-    run_in_batch(data_file=data_file, embed_type=embed)
+    chain_of_thought = not args.skip_chain
+    run_in_batch(data_file=data_file, embed_type=embed, chain_of_thought=chain_of_thought)
 
 

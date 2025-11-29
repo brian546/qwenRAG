@@ -27,8 +27,22 @@ MAX_MEMORY_SIZE = 8 # max number of messages to keep in history
 
 
 # %%
-def load_graph(embed: str = "static") -> StateGraph:
-    """Load the RAG agent."""
+def load_graph(embed: str = "static", chain_of_thought: bool = True) -> StateGraph:
+    """Load the RAG agent.
+    
+    Parameters
+    ==========
+    embed: str
+        Embedding type to use: static, dense, sparse, qwen
+        
+    chain_of_thought: bool
+        Whether to use chain of thought reasoning
+
+    Returns
+    =======
+    StateGraph  
+    
+    """
     vector_store = load_vector_store(embed)
 
     response_model = init_chat_model(
@@ -139,18 +153,66 @@ def load_graph(embed: str = "static") -> StateGraph:
         # save the conversation history 
         # and clean the retrived docs for question in next round
         return {"answer": response, "history": history, "retrieved_docs": [], "retrieved_id_scores": [] }
+    
+    def generate_answer_from_context(state: RAGState):
+        """Generate the final answer"""
+
+        GENERATE_PROMPT = (
+            "You are an assistant for question-answering tasks. "
+            "Based on the context and previous conversations if available to answer the question. "
+            "Beginning with 'Answer:' to answer the question"
+            "Keep the answer concise and simple.\n"
+
+            "Question: {question} \n"
+            "Previous Conversations: {history}\n"
+            "Context: {context}"
+            
+            )
+
+
+        question = state["question"]
+        context = "\n\n".join(state["retrieved_docs"])
+        history = state.get("history",[])
+        history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history]) if history else "None"
+
+        prompt = GENERATE_PROMPT.format(question=question,context=context, history=history)
+        response = response_model.invoke([{"role": "user", "content": prompt}])
+        response = response.content.split("Answer:")[-1].strip()
+
+
+        # update history
+        history = state.get("history", [])
+        history.append(Message(role="user", content=question))
+        history.append(Message(role="assistant", content=response))
+
+        # remove old history
+        if len(history) > MAX_MEMORY_SIZE:
+            history = history[MAX_MEMORY_SIZE:]
+
+        # reply the question, 
+        # save the conversation history 
+        # and clean the retrived docs for question in next round
+        return {"answer": response, "history": history, "retrieved_docs": [], "retrieved_id_scores": [] }
 
 
     workflow = StateGraph(RAGState)
     workflow.add_node(rewrite_query)
     workflow.add_node(search_documents)
-    workflow.add_node(generate_answer)
-    workflow.add_node(chain_of_thought)
+    if chain_of_thought:
+        workflow.add_node(chain_of_thought)
+        workflow.add_node(generate_answer)
+    else:
+        workflow.add_node(generate_answer_from_context)
+
     workflow.add_edge(START, "rewrite_query")
     workflow.add_edge("rewrite_query", "search_documents")
-    workflow.add_edge("search_documents", "chain_of_thought")
-    workflow.add_edge("chain_of_thought", "generate_answer")
-    workflow.add_edge("generate_answer", END)
+    if chain_of_thought:
+        workflow.add_edge("search_documents", "chain_of_thought")
+        workflow.add_edge("chain_of_thought", "generate_answer")
+        workflow.add_edge("generate_answer", END)
+    else:
+        workflow.add_edge("search_documents", "generate_answer_from_context")
+        workflow.add_edge("generate_answer_from_context", END)
 
     # memory checkpointer for mult-turn conversation
     memory = MemorySaver()
