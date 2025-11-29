@@ -21,7 +21,8 @@ This repository implements a Retrieval-Augmented Generation (RAG) system using t
   - `chromadb/`:
     - `chroma.sqlite3`: Chroma DB SQLite file (storage).
     - `<uuid>/` directories: internal Chroma data shards.
-- ``results/`: Directory to store generated results.
+- `results/`: Directory to store generated results.
+- `test_predictions.jsonl`: Final predictions file for evaluation.
 
 ## Set up Environment
 To set up the required environment, first intall ollama from [ollama.com](https://ollama.com/). After that, install qwen2.5-instruct model by running:
@@ -62,4 +63,6 @@ For generation evaluation, run:
 ```bash
 python eval/eval_hotpotqa.py --gold data/validation.jsonl -k 10 --pred PREDICTED_FILE 
 ``` 
+## 
+
 
