@@ -1,4 +1,4 @@
-# QwenRAG
+# QwenRAG 🤖
 
 This repository implements a Retrieval-Augmented Generation (RAG) system using the Qwen-2.5-instruct model from ollama in Linux. The system integrates various vector store for retrieval and provides a StreamLit-based chatbot interface for interactive question answering based on HQ-small dataset.
 
