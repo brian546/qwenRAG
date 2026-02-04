@@ -1,6 +1,6 @@
 # QwenRAG 🤖
 
-This repository implements a Retrieval-Augmented Generation (RAG) system using the Qwen-2.5-instruct model from ollama in Linux. The system integrates vector stores of various types, including BM25, Model2Vec, and Qwen3-Embedding, for retrieval and provides a StreamLit-based chatbot interface for interactive question answering based on HQ-small dataset.
+This repository implements a Retrieval-Augmented Generation (RAG) system using the Qwen-2.5-instruct model from ollama in Linux. The system integrates vector stores of various types, including BM25, Model2Vec, and Qwen3-Embedding, for retrieval and provides a StreamLit-based chatbot interface for interactive question answering.
 
 ## Project Structure
 
